@@ -27,7 +27,7 @@ describe('calcularBeneficio', () => {
       { grado: 17.5, factor: 3.0 },
       { grado: 19.0, factor: 3.0 },
       { grado: 20.0, factor: 4.5 },
-      { grado: 22.5, factor: 6.5 },
+      { grado: 22.5, factor: 6.0 },
       { grado: 25.0, factor: 7.5 },
       { grado: 27.5, factor: 9.0 },
       { grado: 30.0, factor: 10.5 },
@@ -46,24 +46,24 @@ describe('calcularBeneficio', () => {
   });
 
   describe('Pensión parcial (40% ≤ grado < 70%)', () => {
-    it('grado 40% → PENSION_PARCIAL, 30% SBM mensual', () => {
+    it('grado 40% → PENSION_PARCIAL, 35% SBM mensual', () => {
       const r = calcularBeneficio(SBM, 40);
       expect(r.tipoBeneficio).toBe('PENSION_PARCIAL');
-      expect(r.monto).toBe(SBM * 0.3);
+      expect(r.monto).toBe(SBM * 0.35);
       expect(r.periodicidad).toBe('MENSUAL');
     });
 
-    it('grado 55% → PENSION_PARCIAL, 30% SBM mensual', () => {
+    it('grado 55% → PENSION_PARCIAL, 35% SBM mensual', () => {
       const r = calcularBeneficio(SBM, 55);
       expect(r.tipoBeneficio).toBe('PENSION_PARCIAL');
-      expect(r.monto).toBe(SBM * 0.3);
+      expect(r.monto).toBe(SBM * 0.35);
       expect(r.periodicidad).toBe('MENSUAL');
     });
 
-    it('grado 69.99% → PENSION_PARCIAL, 30% SBM mensual', () => {
+    it('grado 69.99% → PENSION_PARCIAL, 35% SBM mensual', () => {
       const r = calcularBeneficio(SBM, 69.99);
       expect(r.tipoBeneficio).toBe('PENSION_PARCIAL');
-      expect(r.monto).toBe(SBM * 0.3);
+      expect(r.monto).toBe(SBM * 0.35);
       expect(r.periodicidad).toBe('MENSUAL');
     });
   });
@@ -100,7 +100,7 @@ describe('calcularBeneficio', () => {
     it('gran invalidez no afecta pensión parcial', () => {
       const r = calcularBeneficio(SBM, 55, { granInvalidez: true });
       expect(r.tipoBeneficio).toBe('PENSION_PARCIAL');
-      expect(r.monto).toBe(SBM * 0.3);
+      expect(r.monto).toBe(SBM * 0.35);
     });
   });
 
@@ -108,6 +108,89 @@ describe('calcularBeneficio', () => {
     it('sin pasar opciones, granInvalidez es false', () => {
       const r = calcularBeneficio(SBM, 70);
       expect(r.monto).toBe(SBM * 0.7);
+    });
+  });
+
+  // ── Brechas 3 y 4: incremento por hijo + topes ─────────────────────────────
+
+  describe('Incremento por hijo — pensión parcial (tope 50% SBM)', () => {
+    it('0 hijos → sin incremento (35%)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 0 });
+      expect(r.monto).toBe(SBM * 0.35);
+    });
+
+    it('1 hijo → sin incremento (35%)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 1 });
+      expect(r.monto).toBe(SBM * 0.35);
+    });
+
+    it('2 hijos → sin incremento (35%)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 2 });
+      expect(r.monto).toBe(SBM * 0.35);
+    });
+
+    it('3 hijos → +5% (40%)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 3 });
+      expect(r.monto).toBe(SBM * 0.40);
+    });
+
+    it('4 hijos → +10% (45%)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 4 });
+      expect(r.monto).toBe(SBM * 0.45);
+    });
+
+    it('5 hijos → +15% (50%, exacto en el tope)', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 5 });
+      expect(r.monto).toBe(SBM * 0.50);
+    });
+
+    it('6 hijos → capped al 50%', () => {
+      const r = calcularBeneficio(SBM, 55, { numHijos: 6 });
+      expect(r.monto).toBe(SBM * 0.50);
+    });
+  });
+
+  describe('Incremento por hijo — pensión total sin gran invalidez (tope 100% SBM)', () => {
+    it('0 hijos → sin incremento (70%)', () => {
+      const r = calcularBeneficio(SBM, 80, { numHijos: 0 });
+      expect(r.monto).toBe(SBM * 0.70);
+    });
+
+    it('3 hijos → +5% (75%)', () => {
+      const r = calcularBeneficio(SBM, 80, { numHijos: 3 });
+      expect(r.monto).toBe(SBM * 0.75);
+    });
+
+    it('8 hijos → +30% (100%, exacto en el tope)', () => {
+      const r = calcularBeneficio(SBM, 80, { numHijos: 8 });
+      expect(r.monto).toBe(SBM * 1.00);
+    });
+
+    it('9 hijos → capped al 100%', () => {
+      const r = calcularBeneficio(SBM, 80, { numHijos: 9 });
+      expect(r.monto).toBe(SBM * 1.00);
+    });
+  });
+
+  describe('Incremento por hijo — pensión total con gran invalidez (tope 140% SBM)', () => {
+    it('0 hijos → sin incremento (100%)', () => {
+      const r = calcularBeneficio(SBM, 80, { granInvalidez: true, numHijos: 0 });
+      expect(r.monto).toBe(SBM * 1.00);
+    });
+
+    it('3 hijos → +5% (105%)', () => {
+      const r = calcularBeneficio(SBM, 80, { granInvalidez: true, numHijos: 3 });
+      expect(r.monto).toBe(SBM * 1.05);
+    });
+
+    it('10 hijos → +40% (140%, exacto en el tope)', () => {
+      const r = calcularBeneficio(SBM, 80, { granInvalidez: true, numHijos: 10 });
+      expect(r.monto).toBe(SBM * 1.40);
+    });
+
+    it('11 hijos → capped al 140%', () => {
+      const r = calcularBeneficio(SBM, 80, { granInvalidez: true, numHijos: 11 });
+      expect(r.monto).toBe(SBM * 1.40);
     });
   });
 });
